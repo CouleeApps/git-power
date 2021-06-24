@@ -95,15 +95,15 @@ Test
 				len++;
 			} while (isalnum(*line_end));
 			//author Glenn Smith <couleeapps@gmail.com> 1624473924 +0613
-			//                                                     ^----
+			//                                                     ^---
 			line_end--;
 			len++;
 			//author Glenn Smith <couleeapps@gmail.com> 1624473924 +0613
-			//                                                    ^-----
+			//                                                    ^----
 			line_end--;
 			len++;
 			//author Glenn Smith <couleeapps@gmail.com> 1624473924 +0613
-			//                                                   ^------
+			//                                                   ^-----
 			do {
 				line_end--;
 				len++;
