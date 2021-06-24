@@ -5,10 +5,11 @@ emPOWer your commits.
 A [Proof of Work](https://en.wikipedia.org/wiki/Proof_of_work) is a cryptographic proof 
 that an amount of work has been done. Often, these are seen in the form of
 `Hash(data || nonce)` where the result of the hash has some number of leading zero bits. 
-Since git commits are identified with a hash, and you can use the timestamps as a nonce,
-you can generate many hashes for one set of changes and effectively compute a Proof of
-Work for a git commit. This tool does that, with a configurable number of threads and
-leading zero bits on the commit hash.  
+Since hashes are one-way functions, this is effectively a O(2^n) brute force for n leading
+zero bits. Since git commits are identified with a hash, and you can use the timestamps as
+a nonce, you can generate many hashes for one set of changes and effectively compute a
+Proof of Work for a git commit. This tool does that, with a configurable number of
+threads and leading zero bits on the commit hash.  
 
 ## Why?
 Some joke about "Git is a blockchain" went too far, now we have this.
@@ -18,8 +19,9 @@ Reasonably. On my Intel i9 9880H @ 2.3GHz with 16 threads, it can compute about 
 Assuming you want to calculate a hash with 32 leading zero bits, this  should take
 (2^32 / 6,000,000) ~= 715 seconds on average, though the variance is pretty high.
 Hashcat's benchmark reports my CPU can do about 315MH/s for SHA-1, which smells like
-the algorithm in `libgit2` is not very well-optimized. Since this is not a serious 
-attempt at brute forcing, getting ~2% of maximum optimized performance is pretty good.
+the algorithm in `libgit2` is not very well-optimized. Since I'm not about to reimplement
+`libgit2`'s hashing functions, getting ~2% of maximum optimized performance is good enough
+for me.
 
 ## Usage
 
@@ -27,8 +29,8 @@ attempt at brute forcing, getting ~2% of maximum optimized performance is pretty
 
 `git-power` operates on the git repository in the current working directory.
 The only supported run options are the number of leading bits to brute-force and the
-of threads created to do the work. By default, `git-power` will use 32 bits and the max
-number of hardware threads supported.
+number of threads created to do the work. By default, `git-power` will use 32 bits and
+the max number of hardware threads supported.
 
 When a matching commit hash is found, it will automatically update your repository HEAD
 and replace the latest commit. Note that this will break any GPG signature on the commit
@@ -50,7 +52,11 @@ First, install via `cmake`:
 
 Then, you can use it through `git` like any other utility:
 
-    git power 32 16
+    # Default settings: 32 and <hardware thread count>
+    git power
+
+    # MacBook-friendly
+    git power 24 8
 
 
 ## License

@@ -1,10 +1,18 @@
-#include <unistd.h>
+#include <assert.h>
+#include <signal.h>
+#include <string.h>
 #include <stdio.h>
 #include <sys/time.h>
-#include <git2.h>
+#include <unistd.h>
+
 // Did I use c++ only for its threads? Maybe
+#include <atomic>
+#include <condition_variable>
+#include <mutex>
 #include <thread>
 #include <vector>
+
+#include <git2.h>
 
 struct result_t {
 	git_time author_time;
