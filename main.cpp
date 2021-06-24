@@ -1,12 +1,21 @@
 #include <assert.h>
+#include <ctype.h>
 #include <signal.h>
 #include <string.h>
 #include <stdio.h>
-#include <sys/time.h>
+#ifdef _WIN32
+// Why tho
+#define NOMINMAX
+#include <direct.h>
+#define getcwd _getcwd
+#else
 #include <unistd.h>
+#endif
 
 // Did I use c++ only for its threads? Maybe
+#include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <mutex>
 #include <thread>
@@ -223,10 +232,11 @@ Test
 	git_buf_dispose(&buf);
 
 	// Report results
-	result = result_t{
-		.author_time = author->when,
-		.committer_time = committer->when,
-	};
+	result_t local_result{};
+	local_result.author_time = author->when,
+	local_result.committer_time = committer->when,
+
+	result = local_result;
 	success = true;
 	finished = true;
 	cv.notify_all();
@@ -306,8 +316,7 @@ int main(int argc, const char **argv) {
 	success = false;
 	finished = false;
 	attempts = 0;
-	timeval start{};
-	gettimeofday(&start, nullptr);
+	auto start = std::chrono::high_resolution_clock::now();
 
 	std::unique_lock<std::mutex> lk(m);
 	signal(SIGINT, &sigint_handler);
@@ -333,14 +342,12 @@ int main(int argc, const char **argv) {
 		char id[0x100];
 		git_oid_tostr(id, 0x100, &close);
 
-		timeval end{};
-		gettimeofday(&end, nullptr);
+		auto end = std::chrono::high_resolution_clock::now();
+		auto difference = end - start;
 
-		timeval difference{};
-		timersub(&end, &start, &difference);
-
-		fprintf(stderr, "\rRuns: %12llu Best found: %s (%d/%d bits) Time: %ld.%06d", a, id,
-		        b, bits, difference.tv_sec, difference.tv_usec);
+		fprintf(stderr, "\rRuns: %12llu Best found: %s (%d/%d bits) Time: %lld.%06lld", a, id,
+		        b, bits, std::chrono::duration_cast<std::chrono::seconds>(difference).count(),
+		        std::chrono::duration_cast<std::chrono::microseconds>(difference).count() % 1000000);
 	}
 
 	// Wait for threads
@@ -378,13 +385,11 @@ int main(int argc, const char **argv) {
 
 	uint64_t a = attempts;
 
-	timeval end{};
-	gettimeofday(&end, nullptr);
-
-	timeval difference{};
-	timersub(&end, &start, &difference);
-	printf("Stats: %llu attempts in %ld.%06d time\n", a,
-	       difference.tv_sec, difference.tv_usec);
+	auto end = std::chrono::high_resolution_clock::now();
+	auto difference = end - start;
+	printf("Stats: %llu attempts in %lld.%06lld time\n", a,
+	       std::chrono::duration_cast<std::chrono::seconds>(difference).count(),
+	       std::chrono::duration_cast<std::chrono::microseconds>(difference).count() % 1000000);
 
 	// Cleanup
 	delete[] parents;

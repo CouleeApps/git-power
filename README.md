@@ -38,14 +38,23 @@ and replace the latest commit. Note that this will break any GPG signature on th
 
 ## Building
 
+### macOS / Linux
 This tool requires `cmake` and `libgit2` to build. You can get `libgit2` through your
 package manager, or at [libgit2.org](https://libgit2.org/).
 Build steps are straight-forward from there:
 
     cmake -B build && cmake --build build
 
+### Windows
+On Windows, you need to compile libgit2 yourself. Then just point `cmake` at it, and you should be good: 
+
+    # Be sure to specify the correct arch
+    cmake -B build -A x64 "-DCMAKE_PREFIX_PATH=C:\Program Files\libgit2"
+    cmake --build build
+
 ## Installing
 
+### macOS / Linux
 First, install via `cmake`:
 
     cmake --install build
@@ -58,14 +67,24 @@ Then, you can use it through `git` like any other utility:
     # MacBook-friendly
     git power 24 8
 
+### Windows
+Drop `git-power.exe` and `git2.dll` in your git installation's `bin` directory. On my machine, that's at `C:\Program Files\Git\mingw64\bin`. Then you can use it like normal.
+
+    # Default settings: 32 and <hardware thread count>
+    git power
+    
+    # APU-friendly
+    git power 24 8
 
 ## License
 MIT license. I'm really not sure who would want to reuse this, but it's here if you want.
+
+## How long did you spend running it on this repo
+Too long.
 
 ## Will you Rewrite it in Rust (TM)?
 It wouldn't be too hard. Feel free to submit a pull request whose commit hash starts with
 at least 32 zero bits.
 
 ## Please apologize for creating this
-
 Sorry.
