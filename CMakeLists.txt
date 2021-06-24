@@ -11,3 +11,5 @@ add_executable(git-power main.cpp)
 
 target_include_directories(git-power PRIVATE ${LIBGIT2_INCLUDE_DIR})
 target_link_libraries(git-power PRIVATE ${LIBGIT2_LIBRARIES})
+
+install(TARGETS git-power)

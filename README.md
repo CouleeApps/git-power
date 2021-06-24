@@ -14,22 +14,21 @@ leading zero bits on the commit hash.
 Some joke about "Git is a blockchain" went too far, now we have this.
 
 ## Is it fast?
-Reasonably. On my Intel i9 9880H @ 2.3GHz with 16 threads, it can compute about 4.9MH/s.
+Reasonably. On my Intel i9 9880H @ 2.3GHz with 16 threads, it can compute about 6MH/s.
 Assuming you want to calculate a hash with 32 leading zero bits, this  should take
-(2^32 / 4,900,000) ~= 876 seconds on average, though the variance is pretty high.
+(2^32 / 6,000,000) ~= 715 seconds on average, though the variance is pretty high.
 Hashcat's benchmark reports my CPU can do about 315MH/s for SHA-1, which smells like
 the algorithm in `libgit2` is not very well-optimized. Since this is not a serious 
-attempt at brute forcing, getting 1% of maximum optimized performance is pretty good. Some
-light instrumentation shows that `libgit2`'s hash function takes 70% of the run time, and 
-I'm not about to rewrite it.
+attempt at brute forcing, getting ~2% of maximum optimized performance is pretty good.
 
 ## Usage
 
-    git-power <bits> <threads>
+    git-power [bits [threads]]
 
 `git-power` operates on the git repository in the current working directory.
 The only supported run options are the number of leading bits to brute-force and the
-of threads created to do the work.
+of threads created to do the work. By default, `git-power` will use 32 bits and the max
+number of hardware threads supported.
 
 When a matching commit hash is found, it will automatically update your repository HEAD
 and replace the latest commit. Note that this will break any GPG signature on the commit
@@ -42,6 +41,17 @@ package manager, or at [libgit2.org](https://libgit2.org/).
 Build steps are straight-forward from there:
 
     cmake -B build && cmake --build build
+
+## Installing
+
+First, install via `cmake`:
+
+    cmake --install build
+
+Then, you can use it through `git` like any other utility:
+
+    git power 32 16
+
 
 ## License
 MIT license. I'm really not sure who would want to reuse this, but it's here if you want.
