@@ -22,10 +22,14 @@
 #include <vector>
 
 #include <git2.h>
+#include <openssl/crypto.h>
+#include <openssl/conf.h>
+#include <openssl/evp.h>
+#include <openssl/err.h>
 
 struct result_t {
-	git_time author_time;
-	git_time committer_time;
+	char buf[0x1000];
+	size_t buf_size;
 };
 
 std::mutex m;
@@ -66,6 +70,51 @@ Test
 
 	 */
 
+	// Add a line for ourselves
+	char *modified_commit = new char[buf.size + 0x100];
+	size_t commit_size = 0;
+
+	// "nonce <num>\n<commit>"
+	commit_size += snprintf(modified_commit + commit_size, 0x100, "nonce 000000000001\n");
+	memcpy(modified_commit + commit_size, buf.ptr, buf.size);
+	commit_size += buf.size;
+	modified_commit[commit_size] = 0;
+
+	// When git sha1's the commit, it includes the metadata for object type and size
+	// In practice this just adds "commit <length>\0" to the front of the buffer being
+	// passed into SHA1. So by precomputing this ourselves we can save all of the error
+	// checking done by git, and use our own SHA1 implementation (which is likely faster).
+
+	char *obj_buf = new char[buf.size + 0x100];
+	size_t obj_size = 0;
+	size_t header_size = 0;
+
+	// "commit <length>\0"
+	header_size += snprintf(obj_buf, 0x100, "commit %zd", buf.size);
+	obj_buf[header_size] = 0;
+	header_size += 1;
+
+	char *commit_buf = obj_buf + header_size;
+	memcpy(commit_buf, modified_commit, commit_size);
+	commit_buf[commit_size] = 0;
+
+	obj_size += header_size;
+	obj_size += commit_size;
+
+	// Null terminate for sanity
+	obj_buf[obj_size] = 0;
+
+	/* Now we have:
+
+commit 274\0tree d11fc77c07df4faadf669a4e397714a1bd588f5d
+parent 0000255c99724e379f925df516265e9535e3feb0
+author Glenn Smith <couleeapps@gmail.com> 1624473924 +0613
+committer Glenn Smith <couleeapps@gmail.com> 1624473924 -0302
+
+Test
+
+	 */
+
 	// Find point in buf where we change timestamps
 	char *author_ts = nullptr;
 	char *committer_ts = nullptr;
@@ -73,7 +122,7 @@ Test
 	size_t committer_ts_len = 0;
 
 	// Evil pointer shit
-	for (char *start = buf.ptr; start < buf.ptr + buf.size; start++) {
+	for (char *start = obj_buf; start < obj_buf + obj_size; start++) {
 		if (strncmp(start, "\nauthor ", strlen("\nauthor ")) == 0 ||
 		    strncmp(start, "\ncommitter ", strlen("\ncommitter ")) == 0) {
 			// Author/Committer line
@@ -192,7 +241,12 @@ Test
 
 		// The slow part
 		git_oid hash;
-		git_odb_hash(&hash, buf.ptr, buf.size, GIT_OBJECT_COMMIT);
+		unsigned int md_len;
+		// Or insert your favorite SHA1 function here
+		EVP_Digest(obj_buf, obj_size, &hash.id[0], &md_len, EVP_sha1(), NULL);
+
+		// If it's not 20 then we just demolished the stack lmao
+		assert(md_len == 20);
 
 		// Make sure it matches
 		good_bits = 0;
@@ -213,33 +267,34 @@ Test
 	} while (good_bits != bits);
 
 	// Big sanity check here since we think this is a good hash
-
 	git_oid hash;
-	git_buf buf2{};
-	git_commit_create_buffer(&buf2, repository, author, committer, message_encoding,
-	                         message, tree, parent_count, parents);
-	git_odb_hash(&hash, buf2.ptr, buf2.size, GIT_OBJECT_COMMIT);
+	git_odb_hash(&hash, commit_buf, commit_size, GIT_OBJECT_COMMIT);
 	int test = 0;
 	for (size_t n = 0; n < bits; n++) {
 		test |= (hash.id[n / 8] >> (7 - (n % 8))) & 1;
 	}
 
-	// Hopefully these never fail
-	assert(strcmp(buf.ptr, buf2.ptr) == 0);
+	// Hopefully this never fails
 	assert(test == 0);
 
-	git_buf_dispose(&buf2);
+	{
+		std::unique_lock<std::mutex> l(m);
+
+		if (!finished) {
+			// Report results
+			result_t local_result{};
+			local_result.buf_size = commit_size;
+			memcpy(local_result.buf, commit_buf, commit_size);
+
+			result = local_result;
+			success = true;
+			finished = true;
+			cv.notify_all();
+		}
+	}
+
 	git_buf_dispose(&buf);
-
-	// Report results
-	result_t local_result{};
-	local_result.author_time = author->when,
-	local_result.committer_time = committer->when,
-
-	result = local_result;
-	success = true;
-	finished = true;
-	cv.notify_all();
+	delete [] obj_buf;
 }
 
 void sigint_handler(int sig) {
@@ -263,6 +318,9 @@ int main(int argc, const char **argv) {
 		sscanf(argv[2], "%d", &threads);
 
 	git_libgit2_init();
+	ERR_load_CRYPTO_strings();
+	OpenSSL_add_all_algorithms();
+	OPENSSL_no_config();
 
 	char dir[0x400];
 	getcwd(dir, 0x400);
@@ -345,9 +403,10 @@ int main(int argc, const char **argv) {
 		auto end = std::chrono::high_resolution_clock::now();
 		auto difference = end - start;
 
-		fprintf(stderr, "\rRuns: %12llu Best found: %s (%d/%d bits) Time: %lld.%06lld", a, id,
+		fprintf(stderr, "\rRuns: %12llu Best found: %s (%d/%d bits) Time: %lld.%06lld ~%fMH/s", a, id,
 		        b, bits, std::chrono::duration_cast<std::chrono::seconds>(difference).count(),
-		        std::chrono::duration_cast<std::chrono::microseconds>(difference).count() % 1000000);
+		        std::chrono::duration_cast<std::chrono::microseconds>(difference).count() % 1000000,
+		        (double)a / (double)std::chrono::duration_cast<std::chrono::microseconds>(difference).count());
 	}
 
 	// Wait for threads
@@ -358,15 +417,16 @@ int main(int argc, const char **argv) {
 	// Extract results
 	if (success) {
 		result_t r = result;
-		author->when = r.author_time;
-		committer->when = r.committer_time;
+		char commit_buffer[0x1000];
+		size_t commit_size = r.buf_size;
+		memcpy(commit_buffer, r.buf, r.buf_size);
+
+		git_odb *db;
+		git_repository_odb(&db, repository);
 
 		// And make the commit for them
 		git_oid hash;
-		git_commit_create(&hash, repository, nullptr, author, committer,
-		                  message_encoding,
-		                  message, tree, parent_count,
-		                  (const git_commit **)parents);
+		git_odb_write(&hash, db, commit_buffer, commit_size, GIT_OBJECT_COMMIT);
 
 		// Fancy print
 		char id[0x100];
@@ -400,6 +460,10 @@ int main(int argc, const char **argv) {
 	git_repository_free(repository);
 
 	git_libgit2_shutdown();
+
+	EVP_cleanup();
+	CRYPTO_cleanup_all_ex_data();
+	ERR_free_strings();
 
 	return 0;
 }
