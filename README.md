@@ -6,22 +6,23 @@ A [Proof of Work](https://en.wikipedia.org/wiki/Proof_of_work) is a cryptographi
 that an amount of work has been done. Often, these are seen in the form of
 `Hash(data || nonce)` where the result of the hash has some number of leading zero bits. 
 Since hashes are one-way functions, this is effectively a O(2^n) brute force for n leading
-zero bits. Since git commits are identified with a hash, and you can use the timestamps as
-a nonce, you can generate many hashes for one set of changes and effectively compute a
-Proof of Work for a git commit. This tool does that, with a configurable number of
-threads and leading zero bits on the commit hash.  
+zero bits. Since git commits are identified with a hash, and you can insert arbitrary
+fields into a commit header, you can generate many hashes for one set of changes and
+effectively compute a Proof of Work for a git commit. This tool does that, with a
+configurable number of threads and leading zero bits on the commit hash.  
 
 ## Why?
 Some joke about "Git is a blockchain" went too far, now we have this.
 
 ## Is it fast?
-Reasonably. On my Intel i9 9880H @ 2.3GHz with 16 threads, it can compute about 6MH/s.
-Assuming you want to calculate a hash with 32 leading zero bits, this  should take
-(2^32 / 6,000,000) ~= 715 seconds on average, though the variance is pretty high.
-Hashcat's benchmark reports my CPU can do about 315MH/s for SHA-1, which smells like
-the algorithm in `libgit2` is not very well-optimized. Since I'm not about to reimplement
-`libgit2`'s hashing functions, getting ~2% of maximum optimized performance is good enough
-for me.
+Reasonably. On my Intel i9 9880H @ 2.3GHz with 16 threads, it can compute about 12MH/s at
+peak CPU core boost clocks. If you account for the less-than-stellar MacBook thermals, it
+drops to about 8MH/s. But assuming you can get good speeds, and assuming you want to
+calculate a hash with 32 leading zero bits, this should take
+(2^32 / 12,000,000) ~= 360 seconds on average, though the variance is pretty high.
+Hashcat's benchmark reports my CPU can do about 315MH/s for SHA-1, so OpenSSL's hash 
+implementation is probably not optimized well for this. Maybe someone can look into
+adapting Hashcat into this, but it's a bit beyond the scope I'm willing to do. 
 
 ## Usage
 
@@ -33,23 +34,31 @@ number of threads created to do the work. By default, `git-power` will use 32 bi
 the max number of hardware threads supported.
 
 When a matching commit hash is found, it will automatically update your repository HEAD
-and replace the latest commit. Note that this will break any GPG signature on the commit
-(for obvious reasons), but all other non-date metadata will be maintained.
+and replace the latest commit. NEW: If your commit is GPG-signed, it will stay signed
+even after running this! See the source for details on how this witchcraft is performed.
 
 ## Building
 
-### macOS / Linux
-This tool requires `cmake` and `libgit2` to build. You can get `libgit2` through your
-package manager, or at [libgit2.org](https://libgit2.org/).
+### Linux
+This tool requires `cmake`, `libgit2`, and `OpenSSL` to build. You can get `libgit2` and
+`OpenSSL` through your package manager, or at [libgit2.org](https://libgit2.org/).
 Build steps are straight-forward from there:
 
     cmake -B build && cmake --build build
 
+### macOS
+On macOS, Apple is rude and won't let you link with the system-provided `libcrypto`, so
+you need to `brew install openssl` (or build it yourself). Then you can pretend you have a
+real unix system:
+
+    cmake -B build -DOPENSSL_ROOT_PATH=/usr/local/opt/openssl && cmake --build build
+
 ### Windows
-On Windows, you need to compile libgit2 yourself. Then just point `cmake` at it, and you should be good: 
+On Windows, you need to compile `libgit2` and `OpenSSL` yourself. Then just point `cmake`
+at them, and you should be good: 
 
     # Be sure to specify the correct arch
-    cmake -B build -A x64 "-DCMAKE_PREFIX_PATH=C:\Program Files\libgit2"
+    cmake -B build -A x64 "-DCMAKE_PREFIX_PATH=C:\Program Files\libgit2" "-DOPENSSL_ROOT_PATH=C:\Program Files\OpenSSL"
     cmake --build build
 
 ## Installing
@@ -68,7 +77,9 @@ Then, you can use it through `git` like any other utility:
     git power 24 8
 
 ### Windows
-Drop `git-power.exe` and `git2.dll` in your git installation's `bin` directory. On my machine, that's at `C:\Program Files\Git\mingw64\bin`. Then you can use it like normal.
+Drop `git-power.exe`, `git2.dll`, and `crypto.dll` in your git installation's `bin`
+directory. On my machine, that's at `C:\Program Files\Git\mingw64\bin`. Then you can use
+it like normal.
 
     # Default settings: 32 and <hardware thread count>
     git power
@@ -83,8 +94,8 @@ MIT license. I'm really not sure who would want to reuse this, but it's here if 
 Too long.
 
 ## Will you Rewrite it in Rust (TM)?
-It wouldn't be too hard. Feel free to submit a pull request whose commit hash starts with
-at least 32 zero bits.
+~~It wouldn't be too hard. Feel free to submit a pull request whose commit hash starts with
+at least 32 zero bits.~~ [I have received news that someone is doing this.](https://github.com/mkrasnitski/git-power-rs)
 
 ## Please apologize for creating this
 Sorry.
