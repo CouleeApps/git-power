@@ -209,9 +209,11 @@ I should not be allowed near this
 
 	 */
 
+	EVP_MD_CTX *md_ctx = EVP_MD_CTX_new();
+
 	// Local copies of atomics because gotta go fast
-	int good_bits;
-	int local_closest = 0;
+	uint8_t good_bits;
+	uint8_t local_closest = 0;
 
 	// I hope 64 bits is enough
 	uint64_t nonce = 0;
@@ -223,11 +225,10 @@ I should not be allowed near this
 
 		// Increment nonce by 1
 		nonce_start[0] = ' ' + (nonce & 0x3F);
-		// Not sure if it's faster to branch here or always write
-		// It probably doesn't matter too much.
-		if ((nonce & 0x3f) == 0)
+		// Micro optimizing: these two first branches are slower than always writing
+//		if ((nonce & 0x3f) == 0)
 			nonce_start[1] = ' ' + ((nonce >> 6) & 0x3F);
-		if ((nonce & 0xfff) == 0)
+//		if ((nonce & 0xfff) == 0)
 			nonce_start[2] = ' ' + ((nonce >> 12) & 0x3F);
 		if ((nonce & 0x3ffff) == 0)
 			nonce_start[3] = ' ' + ((nonce >> 18) & 0x3F);
@@ -250,13 +251,20 @@ I should not be allowed near this
 		git_oid hash;
 		unsigned int md_len;
 		// Or insert your favorite SHA1 function here
-		EVP_Digest(obj_buf, obj_size, &hash.id[0], &md_len, EVP_sha1(), NULL);
+		EVP_DigestInit_ex(md_ctx, EVP_sha1(), nullptr);
+		EVP_DigestUpdate(md_ctx, obj_buf, obj_size);
+		EVP_DigestFinal_ex(md_ctx, &hash.id[0], &md_len);
 
 		// If it's not 20 then we just demolished the stack lmao
 		assert(md_len == 20);
 
 		// Make sure it matches
 		good_bits = 0;
+#if defined(HAVE_FLSLL)
+		// Nobody is going to ask for more than 64 bits
+		assert(bits <= 64);
+		good_bits = 64 - flsll(htonll(*(uint64_t *)&hash.id[0]));
+#else
 		int still_good = 1;
 		for (int n = 0; n < bits; n++) {
 			// 1 if the bit `n` is unset
@@ -266,6 +274,7 @@ I should not be allowed near this
 			// Will add 1 as long as no bits were set
 			good_bits += still_good;
 		}
+#endif
 		// Only update atomics if we PB because speed
 		if (good_bits > local_closest) {
 			local_closest = good_bits;
@@ -312,6 +321,7 @@ I should not be allowed near this
 		}
 	}
 
+	EVP_MD_CTX_free(md_ctx);
 	delete [] obj_buf;
 }
 
