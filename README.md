@@ -1,5 +1,8 @@
 # `git-power`
-emPOWer your commits.
+emPOWer your commits. Pointlessly flex on your coworkers with bespoke commit hashes,
+all with the convenience of a single command. 
+
+[<img width="795" alt="demo" src="https://user-images.githubusercontent.com/711973/124827890-92e23300-df44-11eb-8702-7627f7c4170b.png">](https://github.com/CouleeApps/git-power/commits/master)
 
 ## What is it?
 A [Proof of Work](https://en.wikipedia.org/wiki/Proof_of_work) is a cryptographic proof 
@@ -36,6 +39,20 @@ the max number of hardware threads supported.
 When a matching commit hash is found, it will automatically update your repository HEAD
 and replace the latest commit. NEW: If your commit is GPG-signed, it will stay signed
 even after running this! See the source for details on how this witchcraft is performed.
+
+### Retroactively
+
+If you want to retroactively emPOWer all of your commits, you can combine `git power`
+with the brilliance of `git rebase --interactive`:
+
+    # emPOWer entire tree (preferred method)
+    git rebase --interactive --exec "git power" --root
+
+    # emPOWer unpushed commits
+    git rebase --interactive --exec "git power" origin/master
+
+    # emPOWer everything after a specific commit
+    git rebase --interactive --exec "git power" 00000000da6a1220576d8c00dff8aa9619b44048
 
 ## Building
 
