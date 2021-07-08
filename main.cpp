@@ -208,7 +208,9 @@ gpgsig -----BEGIN PGP SIGNATURE-----
 I should not be allowed near this
 
 	 */
-
+	EVP_MD_CTX *md_ctx_shared = EVP_MD_CTX_new();
+	EVP_DigestInit_ex(md_ctx_shared, EVP_sha1(), nullptr);
+	EVP_DigestUpdate(md_ctx_shared, obj_buf, nonce_start - obj_buf);
 	EVP_MD_CTX *md_ctx = EVP_MD_CTX_new();
 
 	// Local copies of atomics because gotta go fast
@@ -252,7 +254,8 @@ I should not be allowed near this
 		unsigned int md_len;
 		// Or insert your favorite SHA1 function here
 		EVP_DigestInit_ex(md_ctx, EVP_sha1(), nullptr);
-		EVP_DigestUpdate(md_ctx, obj_buf, obj_size);
+		EVP_MD_CTX_copy_ex(md_ctx, md_ctx_shared);
+		EVP_DigestUpdate(md_ctx, nonce_start, obj_size - (nonce_start - obj_buf));
 		EVP_DigestFinal_ex(md_ctx, &hash.id[0], &md_len);
 
 		// If it's not 20 then we just demolished the stack lmao
@@ -290,7 +293,7 @@ I should not be allowed near this
 			attempts += 0x100;
 		}
 		nonce++;
-	} while (good_bits != bits);
+	} while (good_bits < bits);
 
 	// Big sanity check here since we think this is a good hash
 	git_oid hash;
@@ -322,6 +325,7 @@ I should not be allowed near this
 	}
 
 	EVP_MD_CTX_free(md_ctx);
+	EVP_MD_CTX_free(md_ctx_shared);
 	delete [] obj_buf;
 }
 
