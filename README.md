@@ -68,7 +68,7 @@ On macOS, Apple is rude and won't let you link with the system-provided `libcryp
 you need to `brew install openssl` (or build it yourself). Then you can pretend you have a
 real unix system:
 
-    cmake -B build -DOPENSSL_ROOT_PATH=/usr/local/opt/openssl && cmake --build build
+    cmake -B build -DOPENSSL_ROOT_DIR=/usr/local/opt/openssl && cmake --build build
 
 ### Windows
 On Windows, you need to compile `libgit2` and `OpenSSL` yourself. Then just point `cmake`
