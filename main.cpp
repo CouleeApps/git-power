@@ -212,6 +212,7 @@ I should not be allowed near this
 	EVP_DigestInit_ex(md_ctx_shared, EVP_sha1(), nullptr);
 	EVP_DigestUpdate(md_ctx_shared, obj_buf, nonce_start - obj_buf);
 	EVP_MD_CTX *md_ctx = EVP_MD_CTX_new();
+	EVP_DigestInit_ex(md_ctx, EVP_sha1(), nullptr);
 
 	// Local copies of atomics because gotta go fast
 	uint8_t good_bits;
@@ -253,7 +254,6 @@ I should not be allowed near this
 		git_oid hash;
 		unsigned int md_len;
 		// Or insert your favorite SHA1 function here
-		EVP_DigestInit_ex(md_ctx, EVP_sha1(), nullptr);
 		EVP_MD_CTX_copy_ex(md_ctx, md_ctx_shared);
 		EVP_DigestUpdate(md_ctx, nonce_start, obj_size - (nonce_start - obj_buf));
 		EVP_DigestFinal_ex(md_ctx, &hash.id[0], &md_len);
