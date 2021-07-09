@@ -1,14 +1,3 @@
-/*
-#ifdef _WIN32
-// Why tho
-#define NOMINMAX
-#include <direct.h>
-#define getcwd _getcwd
-#else
-#include <unistd.h>
-#endif
-*/
-
 #include <cassert>
 #include <cctype>
 #include <string>
@@ -25,11 +14,15 @@
 #include <thread>
 #include <vector>
 
-#include <git2.h>
-#include <openssl/crypto.h>
-#include <openssl/conf.h>
-#include <openssl/evp.h>
-#include <openssl/err.h>
+extern "C"
+{
+	#include <git2.h>
+	#include <openssl/crypto.h>
+	#include <openssl/conf.h>
+	#include <openssl/evp.h>
+	#include <openssl/err.h>
+}
+
 
 #include <CLI/CLI.hpp>
 
