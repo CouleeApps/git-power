@@ -1,8 +1,4 @@
-#include <assert.h>
-#include <ctype.h>
-#include <signal.h>
-#include <string.h>
-#include <stdio.h>
+/*
 #ifdef _WIN32
 // Why tho
 #define NOMINMAX
@@ -11,6 +7,14 @@
 #else
 #include <unistd.h>
 #endif
+*/
+
+#include <cassert>
+#include <cctype>
+#include <string>
+#include <cstdio>
+#include <iostream>
+#include <csignal>
 
 // Did I use c++ only for its threads? Maybe
 #include <algorithm>
@@ -26,6 +30,8 @@
 #include <openssl/conf.h>
 #include <openssl/evp.h>
 #include <openssl/err.h>
+
+#include <CLI/CLI.hpp>
 
 struct result_t {
 	// Entire commit buffer (not including "commit 123" header)
@@ -43,7 +49,8 @@ std::atomic<int> closest_bits;
 std::atomic<git_oid> closest;
 std::atomic<uint64_t> attempts;
 
-void try_commits(size_t i, size_t threads, size_t bits, char *base_body, size_t base_size) {
+
+void try_commits(size_t i, size_t threads, size_t bits, char* base_body, size_t base_size) {
 	// We need to modify the original commit data to add a nonce for brute forcing
 	// But where do we do that?
 	// - If the commit is not GPG signed, we can just add an extra field into the commit
@@ -85,17 +92,17 @@ I should not be allowed near this
 
  */
 
-	// Probably large enough for our shenanigans
-	char *modified_commit = new char[base_size + 0x100];
+ // Probably large enough for our shenanigans
+	char* modified_commit = new char[base_size + 0x100];
 	size_t commit_size = 0;
 
 	// Figure out where to insert our nonce header/field
-	char *nonce_insert;
+	char* nonce_insert;
 	// Offset into the commit data where our nonce starts
 	size_t nonce_index;
 
 	// Mega cursed: Check if this is gpg-signed
-	char *gpgsig = strstr(base_body, "-----BEGIN PGP SIGNATURE-----");
+	char* gpgsig = strstr(base_body, "-----BEGIN PGP SIGNATURE-----");
 	if (gpgsig == nullptr) {
 		// No it's not: insert nonce as a field right before the commit message
 		nonce_insert = strstr(base_body, "\n\n");
@@ -107,7 +114,7 @@ I should not be allowed near this
 
 		// Have we modified this commit before? Git will probably not be happy if we have
 		// two copies of the same field
-		char *previous_nonce = strstr(base_body, "\nnonce ");
+		char* previous_nonce = strstr(base_body, "\nnonce ");
 		if (previous_nonce == nullptr) {
 			// Insert nonce header/field
 			// NB: Start with \n because we're going right before the newline(s) in the
@@ -117,11 +124,13 @@ I should not be allowed near this
 			//                                        ^
 			nonce_index = commit_size + 7;
 			commit_size += snprintf(modified_commit + commit_size, 0x100,
-			                        "\nnonce AAAAAAAAAAAAAAAA%zu%zu", i, threads);
-		} else {
+				"\nnonce AAAAAAAAAAAAAAAA%zu%zu", i, threads);
+		}
+		else {
 			nonce_index = (previous_nonce - base_body) + 7;
 		}
-	} else {
+	}
+	else {
 		// Yes it is: insert nonce as a header in the GPG signature
 		nonce_insert = strstr(gpgsig, "\n");
 
@@ -130,15 +139,16 @@ I should not be allowed near this
 
 		// Have we modified this commit before? GPG will probably not be happy if we have
 		// two copies of the same field
-		char *previous_nonce = strstr(base_body, "\n Nonce: ");
+		char* previous_nonce = strstr(base_body, "\n Nonce: ");
 		if (previous_nonce == nullptr) {
 			// Nonce header in GPG signature: "\n Nonce: AAAAAAAAAAAAAAAA01"
 			//                                           ^
 			// Important: There is a space at the start of every line in the signature
 			nonce_index = commit_size + 9;
 			commit_size += snprintf(modified_commit + commit_size, 0x100,
-			                        "\n Nonce: AAAAAAAAAAAAAAAA%zu%zu", i, threads);
-		} else {
+				"\n Nonce: AAAAAAAAAAAAAAAA%zu%zu", i, threads);
+		}
+		else {
 			nonce_index = (previous_nonce - base_body) + 9;
 		}
 	}
@@ -153,7 +163,7 @@ I should not be allowed near this
 	// passed into SHA1. So by precomputing this ourselves we can save all of the error
 	// checking done by git, and we can use our own SHA1 implementation (which is faster).
 
-	char *obj_buf = new char[base_size + 0x100];
+	char* obj_buf = new char[base_size + 0x100];
 	size_t obj_size = 0;
 	size_t header_size = 0;
 
@@ -163,7 +173,7 @@ I should not be allowed near this
 	header_size += 1;
 
 	// Then append our hacked-up commit body
-	char *commit_buf = obj_buf + header_size;
+	char* commit_buf = obj_buf + header_size;
 	memcpy(commit_buf, modified_commit, commit_size);
 	commit_buf[commit_size] = 0;
 
@@ -174,10 +184,10 @@ I should not be allowed near this
 	// Null terminate for sanity
 	obj_buf[obj_size] = 0;
 
-	delete [] modified_commit;
+	delete[] modified_commit;
 
 	// Offset into the real buffer by the offset in the hacked-up buffer
-	char *nonce_start = commit_buf + nonce_index;
+	char* nonce_start = commit_buf + nonce_index;
 
 	/* Now we have:
 
@@ -208,10 +218,10 @@ gpgsig -----BEGIN PGP SIGNATURE-----
 I should not be allowed near this
 
 	 */
-	EVP_MD_CTX *md_ctx_shared = EVP_MD_CTX_new();
+	EVP_MD_CTX* md_ctx_shared = EVP_MD_CTX_new();
 	EVP_DigestInit_ex(md_ctx_shared, EVP_sha1(), nullptr);
 	EVP_DigestUpdate(md_ctx_shared, obj_buf, nonce_start - obj_buf);
-	EVP_MD_CTX *md_ctx = EVP_MD_CTX_new();
+	EVP_MD_CTX* md_ctx = EVP_MD_CTX_new();
 	EVP_DigestInit_ex(md_ctx, EVP_sha1(), nullptr);
 
 	// Local copies of atomics because gotta go fast
@@ -230,9 +240,9 @@ I should not be allowed near this
 		nonce_start[0] = ' ' + (nonce & 0x3F);
 		// Micro optimizing: these two first branches are slower than always writing
 //		if ((nonce & 0x3f) == 0)
-			nonce_start[1] = ' ' + ((nonce >> 6) & 0x3F);
-//		if ((nonce & 0xfff) == 0)
-			nonce_start[2] = ' ' + ((nonce >> 12) & 0x3F);
+		nonce_start[1] = ' ' + ((nonce >> 6) & 0x3F);
+		//		if ((nonce & 0xfff) == 0)
+		nonce_start[2] = ' ' + ((nonce >> 12) & 0x3F);
 		if ((nonce & 0x3ffff) == 0)
 			nonce_start[3] = ' ' + ((nonce >> 18) & 0x3F);
 		if ((nonce & 0xffffff) == 0)
@@ -266,7 +276,7 @@ I should not be allowed near this
 #if defined(HAVE_FLSLL)
 		// Nobody is going to ask for more than 64 bits
 		assert(bits <= 64);
-		good_bits = 64 - flsll(htonll(*(uint64_t *)&hash.id[0]));
+		good_bits = 64 - flsll(htonll(*(uint64_t*)&hash.id[0]));
 #else
 		int still_good = 1;
 		for (int n = 0; n < bits; n++) {
@@ -326,7 +336,7 @@ I should not be allowed near this
 
 	EVP_MD_CTX_free(md_ctx);
 	EVP_MD_CTX_free(md_ctx_shared);
-	delete [] obj_buf;
+	delete[] obj_buf;
 }
 
 void sigint_handler(int sig) {
@@ -336,18 +346,19 @@ void sigint_handler(int sig) {
 }
 
 int main(int argc, const char **argv) {
-	// Arg parsing could be improved
-	if (argc == 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-?") == 0)) {
-		fprintf(stderr, "Usage: %s [bits [threads]]\n", argv[0]);
-		return 1;
-	}
-	// Sensible defaults
-	int bits = 32;
+	CLI::App app { "git power" };
+
 	int threads = std::max((int)std::thread::hardware_concurrency(), 1);
-	if (argc > 1)
-		sscanf(argv[1], "%d", &bits);
-	if (argc > 2)
-		sscanf(argv[2], "%d", &threads);
+	int bits = 32;
+	std::string directory;
+
+	app.add_option("-t,--threads", threads, "Number of threads to use.");
+	app.add_option("-b,--bits", bits, "Number of bits to zero.");
+	app.add_option("-d,--directory", directory, "Set the repo directory.")->default_val("./");
+
+	CLI11_PARSE(app, argc, argv);
+
+		// Sensible defaults
 
 	// libgit2 init is nice
 	git_libgit2_init();
@@ -356,13 +367,15 @@ int main(int argc, const char **argv) {
 	OpenSSL_add_all_algorithms();
 	OPENSSL_no_config();
 
+	/*
 	// Repo in cwd
 	char dir[0x400];
 	getcwd(dir, 0x400);
+	*/
 
 	// Find our repo
 	git_repository *repository;
-	git_repository_open(&repository, dir);
+	git_repository_open(&repository, directory.c_str());
 
 	if (repository == nullptr) {
 		fprintf(stderr, "Current directory is not a git repository.\n");
