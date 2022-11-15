@@ -123,7 +123,7 @@ I should not be allowed near this
 		}
 	} else {
 		// Yes it is: insert nonce as a header in the GPG signature
-		nonce_insert = strstr(gpgsig, "\n");
+		nonce_insert = strstr(gpgsig, "\n\n");
 
 		memcpy(modified_commit, base_body, nonce_insert - base_body);
 		commit_size += nonce_insert - base_body;
