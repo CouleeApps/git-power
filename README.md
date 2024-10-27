@@ -18,12 +18,12 @@ configurable number of threads and leading zero bits on the commit hash.
 Some joke about "Git is a blockchain" went too far, now we have this.
 
 ## Is it fast?
-Reasonably. On my Intel i9 9880H @ 2.3GHz with 16 threads, it can compute about 12MH/s at
+Reasonably. On my fanless M2 MacBook Air, it can compute about 30MH/s at
 peak CPU core boost clocks. If you account for the less-than-stellar MacBook thermals, it
-drops to about 8MH/s. But assuming you can get good speeds, and assuming you want to
+drops to about 21MH/s. But assuming you can get good speeds, and assuming you want to
 calculate a hash with 32 leading zero bits, this should take
-(2^32 / 12,000,000) ~= 360 seconds on average, though the variance is pretty high.
-Hashcat's benchmark reports my CPU can do about 315MH/s for SHA-1, so OpenSSL's hash
+(2^32 / 30,000,000) ~= 140 seconds on average, though the variance is pretty high.
+Hashcat's benchmark reports my CPU can do about 725MH/s for SHA-1, so OpenSSL's hash
 implementation is probably not optimized well for this. Maybe someone can look into
 adapting Hashcat into this, but it's a bit beyond the scope I'm willing to do.
 
