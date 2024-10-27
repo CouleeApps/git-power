@@ -27,6 +27,9 @@
 #include <openssl/evp.h>
 #include <openssl/err.h>
 
+// Sanity check debugging
+// #define DEBUG_PRINT
+
 struct result_t {
 	// Entire commit buffer (not including "commit 123" header)
 	char buf[0x1000];
@@ -131,16 +134,25 @@ I should not be allowed near this
 		// Have we modified this commit before? GPG will probably not be happy if we have
 		// two copies of the same field
 		char *previous_nonce = strstr(base_body, "\n Nonce: ");
-		if (previous_nonce == nullptr) {
-			// Nonce header in GPG signature: "\n Nonce: 01AAAAAAAAAAAAAAAA"
-			//                                           ^
-			// Important: There is a space at the start of every line in the signature
-			nonce_index = commit_size + 9;
-			commit_size += snprintf(modified_commit + commit_size, 0x100,
-			                        "\n Nonce: %zu%zuAAAAAAAAAAAAAAAA", i, threads);
-		} else {
-			nonce_index = (previous_nonce - base_body) + 11;
+		if (previous_nonce != nullptr) {
+			commit_size = previous_nonce - base_body;
 		}
+
+		// Log10 but integer
+		int width = 1;
+		size_t t2 = threads;
+		while (t2 > 9) {
+			width ++;
+			t2 /= 10;
+		}
+
+		// Nonce header in GPG signature: "\n Nonce: 01AAAAAAAAAAAAAAAA"
+		//                                             ^
+		// Important: There is a space at the start of every line in the signature
+		nonce_index = commit_size + snprintf(modified_commit + commit_size, 0x100,
+		                        "\n Nonce: %0*zu%0*zu", width, i, width, threads);
+		commit_size = nonce_index + snprintf(modified_commit + nonce_index, 0x100,
+		                        "AAAAAAAAAAA");
 	}
 	// Copy the rest of the commit after
 	memcpy(modified_commit + commit_size, nonce_insert, base_size - (nonce_insert - base_body));
@@ -221,6 +233,10 @@ I should not be allowed near this
 	// I hope 64 bits is enough
 	uint64_t nonce = 0;
 
+#ifdef DEBUG_PRINT
+	srand(time(NULL));
+#endif
+
 	do {
 		// See if another thread got it
 		if (finished) {
@@ -253,6 +269,12 @@ I should not be allowed near this
 			nonce_start[9] = ' ' + ((nonce >> 54) & 0x3F);
 		if ((nonce & 0xfffffffffffffff) == 0)
 			nonce_start[10] = ' ' + ((nonce >> 60) & 0x3F);
+
+#ifdef DEBUG_PRINT
+		if ((rand() & 0xffff) == 1) {
+			printf("%.20s\n", nonce_start - 11);
+		}
+#endif
 
 		// The slow part
 		git_oid hash;
