@@ -223,8 +223,12 @@ I should not be allowed near this
 
 	do {
 		// See if another thread got it
-		if (finished)
+		if (finished) {
+			EVP_MD_CTX_free(md_ctx);
+			EVP_MD_CTX_free(md_ctx_shared);
+			delete [] obj_buf;
 			return;
+		}
 
 		// Increment nonce by 1
 		nonce_start[0] = ' ' + (nonce & 0x3F);
