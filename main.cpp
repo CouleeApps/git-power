@@ -113,13 +113,13 @@ I should not be allowed near this
 			// NB: Start with \n because we're going right before the newline(s) in the
 			//     header, and don't add one at the end for the same reason.
 
-			// Nonce field in commit fields: "\nnonce AAAAAAAAAAAAAAAA01"
+			// Nonce field in commit fields: "\nnonce 01AAAAAAAAAAAAAAAA"
 			//                                        ^
 			nonce_index = commit_size + 7;
 			commit_size += snprintf(modified_commit + commit_size, 0x100,
-			                        "\nnonce AAAAAAAAAAAAAAAA%zu%zu", i, threads);
+			                        "\nnonce %zu%zuAAAAAAAAAAAAAAAA", i, threads);
 		} else {
-			nonce_index = (previous_nonce - base_body) + 7;
+			nonce_index = (previous_nonce - base_body) + 9;
 		}
 	} else {
 		// Yes it is: insert nonce as a header in the GPG signature
@@ -132,14 +132,14 @@ I should not be allowed near this
 		// two copies of the same field
 		char *previous_nonce = strstr(base_body, "\n Nonce: ");
 		if (previous_nonce == nullptr) {
-			// Nonce header in GPG signature: "\n Nonce: AAAAAAAAAAAAAAAA01"
+			// Nonce header in GPG signature: "\n Nonce: 01AAAAAAAAAAAAAAAA"
 			//                                           ^
 			// Important: There is a space at the start of every line in the signature
 			nonce_index = commit_size + 9;
 			commit_size += snprintf(modified_commit + commit_size, 0x100,
-			                        "\n Nonce: AAAAAAAAAAAAAAAA%zu%zu", i, threads);
+			                        "\n Nonce: %zu%zuAAAAAAAAAAAAAAAA", i, threads);
 		} else {
-			nonce_index = (previous_nonce - base_body) + 9;
+			nonce_index = (previous_nonce - base_body) + 11;
 		}
 	}
 	// Copy the rest of the commit after
@@ -186,7 +186,7 @@ tree d11fc77c07df4faadf669a4e397714a1bd588f5d
 parent 0000255c99724e379f925df516265e9535e3feb0
 author Glenn Smith <couleeapps@gmail.com> 1624473924 +0613
 committer Glenn Smith <couleeapps@gmail.com> 1624473924 -0302
-nonce AAAAAAAAAAAAAAAA01
+nonce 01AAAAAAAAAAAAAAAA
 
 Test
 
@@ -197,13 +197,13 @@ parent 8dfe0ce00895c6a8f55bbd30d2543c1945fcad15
 author Glenn Smith <couleeapps@gmail.com> 1625532218 -0400
 committer Glenn Smith <couleeapps@gmail.com> 1625532226 -0400
 gpgsig -----BEGIN PGP SIGNATURE-----
- Nonce: LOIIFMAAAAAAAAAA01
  Comment: Created with Krypton
 
  iF4EABMKAAYFAmDjp0IACgkQm3HsKD8LehTDDwD/c9DB6IxtAXzF55FjgqevfoNO
  Eegmn53HSsYrRHOE9ZMA/Av/moBkr9Qh/nTO2c3XVfa228grAOIwcSYkn9s6WS25
  =XM24
  -----END PGP SIGNATURE-----
+ Nonce: 01LOIIFMAAAAAAAAAA
 
 I should not be allowed near this
 
